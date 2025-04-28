@@ -19,9 +19,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Clone, Debug, Serialize)]
 pub struct GCSObjectData {
-  pub bucket: String,
-  pub name: String,
-  pub size: u64,
+    pub bucket: String,
+    pub name: String,
+    pub size: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -36,13 +36,7 @@ impl IndexerEvent {
     pub fn uri(&self) -> anyhow::Result<Uri> {
         let path: String = match self {
             IndexerEvent::Custom { source_uri } => source_uri.clone(),
-            IndexerEvent::GCS(event) => [
-                "gs://",
-                &event.bucket,
-                "/",
-                &event.name,
-            ]
-            .join(""),
+            IndexerEvent::GCS(event) => ["gs://", &event.bucket, "/", &event.name].join(""),
         };
         Uri::from_str(&path)
     }

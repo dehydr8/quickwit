@@ -12,20 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use quickwit_cloudrun::indexer::{CloudEvent, handler};
 use quickwit_cloudrun::logger;
+use quickwit_proto::bytes::Bytes;
 use serde_json::Value;
-use std::net::SocketAddr;
 use std::env;
+use std::net::SocketAddr;
+use tokio::signal;
+use tracing::info;
 use warp;
 use warp::Filter;
-use quickwit_cloudrun::indexer::{handler, CloudEvent};
-use quickwit_proto::bytes::Bytes;
-use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     logger::setup_cloudrun_tracer(tracing::Level::INFO)?;
-    
+
     // Define the handler for the indexer
     let indexer = warp::post()
         .and(warp::path::end())
@@ -36,9 +37,9 @@ async fn main() -> anyhow::Result<()> {
                 return Err(warp::reject::custom(InvalidContentType));
             }
 
-            let payload: CloudEvent<Value> = serde_json::from_slice(&body)
-            .map_err(|_| warp::reject::custom(InvalidJson))?;
-            
+            let payload: CloudEvent<Value> =
+                serde_json::from_slice(&body).map_err(|_| warp::reject::custom(InvalidJson))?;
+
             let result = handler(payload).await;
             match result {
                 Ok(value) => Ok(warp::reply::json(&value)),
@@ -58,13 +59,18 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Starting indexer on {}", addr);
 
-    warp::serve(indexer)
-        .bind(addr)
-        .await;
-    
+    let (_, server) = warp::serve(indexer).bind_with_graceful_shutdown(addr, async {
+        // Wait for CTRL+C or SIGTERM
+        signal::ctrl_c()
+            .await
+            .expect("failed to listen for ctrl_c signal");
+        info!("CTRL+C received, starting graceful shutdown");
+    });
+
+    server.await;
+
     Ok(())
 }
-
 
 #[derive(Debug)]
 struct InvalidContentType;

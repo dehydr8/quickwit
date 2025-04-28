@@ -25,12 +25,12 @@ use crate::utils::CloudRunContainerContext;
 
 #[derive(Deserialize, Clone, Debug, Serialize)]
 pub struct CloudEvent<T> {
-  pub id: String,
-  pub datacontenttype: String,
-  pub specversion: String,
-  #[serde(rename = "type")]
-  pub _type: String,
-  pub data: T,
+    pub id: String,
+    pub datacontenttype: String,
+    pub specversion: String,
+    #[serde(rename = "type")]
+    pub _type: String,
+    pub data: T,
 }
 
 async fn indexer_handler(event: CloudEvent<Value>) -> Result<Value, anyhow::Error> {

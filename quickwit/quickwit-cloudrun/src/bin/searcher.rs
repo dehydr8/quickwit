@@ -14,9 +14,10 @@
 
 use quickwit_cloudrun::logger;
 use quickwit_cloudrun::searcher::setup_searcher_api;
-use std::net::SocketAddr;
 use std::env;
-use tracing::{info};
+use std::net::SocketAddr;
+use tokio::signal;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -32,9 +33,15 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Starting searcher on {}", addr);
 
-    warp::serve(routes)
-        .bind(addr)
-        .await;
-    
+    let (_, server) = warp::serve(routes).bind_with_graceful_shutdown(addr, async {
+        // Wait for CTRL+C or SIGTERM
+        signal::ctrl_c()
+            .await
+            .expect("failed to listen for ctrl_c signal");
+        info!("CTRL+C received, starting graceful shutdown");
+    });
+
+    server.await;
+
     Ok(())
 }

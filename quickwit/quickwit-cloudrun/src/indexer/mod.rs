@@ -17,5 +17,5 @@ mod handler;
 mod ingest;
 mod model;
 
-pub use handler::handler;
 pub use handler::CloudEvent;
+pub use handler::handler;

@@ -6794,6 +6794,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "quickwit-cloudrun"
+version = "0.8.0"
+dependencies = [
+ "anyhow",
+ "bytesize",
+ "chitchat",
+ "chrono",
+ "flate2",
+ "http 0.2.12",
+ "mime_guess",
+ "once_cell",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "quickwit-actors",
+ "quickwit-cli",
+ "quickwit-cluster",
+ "quickwit-common",
+ "quickwit-config",
+ "quickwit-index-management",
+ "quickwit-indexing",
+ "quickwit-ingest",
+ "quickwit-janitor",
+ "quickwit-metastore",
+ "quickwit-proto",
+ "quickwit-search",
+ "quickwit-serve",
+ "quickwit-storage",
+ "quickwit-telemetry",
+ "rand 0.8.5",
+ "reqwest 0.12.15",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "warp",
+]
+
+[[package]]
 name = "quickwit-cluster"
 version = "0.8.0"
 dependencies = [

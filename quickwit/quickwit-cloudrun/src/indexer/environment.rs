@@ -1,0 +1,97 @@
+// Copyright 2021-Present Datadog, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use std::env::var;
+
+use once_cell::sync::Lazy;
+use quickwit_common::get_bool_from_env;
+
+pub const CONFIGURATION_TEMPLATE: &str = r#"
+version: 0.8
+node_id: cloudrun-indexer
+cluster_id: cloudrun-ephemeral
+metastore_uri: gs://${QW_CLOUDRUN_METASTORE_BUCKET}/${QW_CLOUDRUN_METASTORE_PREFIX:-index}
+default_index_root_uri: gs://${QW_CLOUDRUN_INDEX_BUCKET}/${QW_CLOUDRUN_INDEX_PREFIX:-index}
+data_dir: /tmp
+"#;
+
+pub static INDEX_CONFIG_URI: Lazy<String> = Lazy::new(|| {
+    var("QW_CLOUDRUN_INDEX_CONFIG_URI")
+        .expect("environment variable `QW_CLOUDRUN_INDEX_CONFIG_URI` should be set")
+});
+
+pub static DISABLE_MERGE: Lazy<bool> =
+    Lazy::new(|| get_bool_from_env("QW_CLOUDRUN_DISABLE_MERGE", false));
+
+pub static DISABLE_JANITOR: Lazy<bool> =
+    Lazy::new(|| get_bool_from_env("QW_CLOUDRUN_DISABLE_JANITOR", false));
+
+pub static MAX_CHECKPOINTS: Lazy<usize> = Lazy::new(|| {
+    var("QW_CLOUDRUN_MAX_CHECKPOINTS").map_or(100, |v| {
+        v.parse()
+            .expect("QW_CLOUDRUN_MAX_CHECKPOINTS must be a positive integer")
+    })
+});
+
+#[cfg(test)]
+mod tests {
+
+    use quickwit_config::{ConfigFormat, NodeConfig};
+
+    use super::*;
+
+    #[tokio::test]
+    #[serial_test::file_serial(with_env)]
+    async fn test_load_config() {
+        // SAFETY: this test may not be entirely sound if not run with nextest or --test-threads=1
+        // as this is only a test, and it would be extremly inconvenient to run it in a different
+        // way, we are keeping it that way
+        // file_serial may not be enough, given other tests not ran serially could read env
+
+        let bucket = "mock-test-bucket";
+        unsafe {
+            std::env::set_var("QW_CLOUDRUN_METASTORE_BUCKET", bucket);
+            std::env::set_var("QW_CLOUDRUN_INDEX_BUCKET", bucket);
+            std::env::set_var(
+                "QW_CLOUDRUN_INDEX_CONFIG_URI",
+                "gs://mock-index-config-bucket",
+            );
+            std::env::set_var("QW_CLOUDRUN_INDEX_ID", "cloudrun-test");
+        };
+        let node_config = NodeConfig::load(ConfigFormat::Yaml, CONFIGURATION_TEMPLATE.as_bytes())
+            .await
+            .unwrap();
+        //
+        assert_eq!(
+            node_config.data_dir_path.to_string_lossy(),
+            "/tmp",
+            "only `/tmp` is writeable in GCP CloudRun"
+        );
+        assert_eq!(
+            node_config.default_index_root_uri,
+            "gs://mock-test-bucket/index"
+        );
+        assert_eq!(
+            node_config.metastore_uri.to_string(),
+            "gs://mock-test-bucket/index"
+        );
+
+        unsafe {
+            std::env::remove_var("QW_CLOUDRUN_METASTORE_BUCKET");
+            std::env::remove_var("QW_CLOUDRUN_INDEX_BUCKET");
+            std::env::remove_var("QW_CLOUDRUN_INDEX_CONFIG_URI");
+            std::env::remove_var("QW_CLOUDRUN_INDEX_ID");
+        }
+    }
+}

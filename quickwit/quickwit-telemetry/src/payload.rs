@@ -120,6 +120,7 @@ pub enum QuickwitFeature {
     Otlp,
     PostgresqMetastore,
     AwsLambda,
+    GCPCloudRun,
 }
 
 fn hashed_host_username() -> String {

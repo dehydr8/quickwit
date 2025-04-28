@@ -4,6 +4,7 @@ members = [
   "quickwit-actors",
   "quickwit-aws",
   "quickwit-cli",
+  "quickwit-cloudrun",
   "quickwit-cluster",
   "quickwit-codegen",
   "quickwit-codegen/example",

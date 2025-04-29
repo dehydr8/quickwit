@@ -19,7 +19,7 @@ use serde_json::Value;
 use std::env;
 use std::net::SocketAddr;
 use tokio::signal;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use warp;
 use warp::Filter;
 
@@ -39,6 +39,8 @@ async fn main() -> anyhow::Result<()> {
                 warn!("Invalid content type: {}", content_type);
                 return Err(warp::reject::custom(InvalidContentType));
             }
+
+            debug!("Content type: {}, Body: {:?}", content_type, body);
 
             let payload: CloudEvent<Value> =
                 serde_json::from_slice(&body).map_err(|_| warp::reject::custom(InvalidJson))?;

@@ -47,8 +47,8 @@ impl IndexerEvent {
             IndexerEvent::Custom {
                 index_id: _,
                 source_uri,
-                index_config_uri,
-            } => [source_uri, "#", index_config_uri].join(""),
+                index_config_uri: _,
+            } => source_uri.clone(),
             IndexerEvent::GCS(event) => ["gs://", &event.bucket, "/", &event.name].join(""),
         };
         Uri::from_str(&path)
@@ -124,7 +124,9 @@ mod tests {
     #[test]
     fn test_custom_event_uri() {
         let cust_event = json!({
-            "source_uri": "gs://quickwit-test/test.json"
+            "source_uri": "gs://quickwit-test/test.json",
+            "index_id": "test",
+            "index_config_uri": "gs://quickwit-test/test.json"
         });
         let parsed_cust_event: IndexerEvent = serde_json::from_value(cust_event).unwrap();
         assert_eq!(

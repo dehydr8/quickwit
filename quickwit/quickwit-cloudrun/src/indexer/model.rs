@@ -26,7 +26,6 @@ use super::environment::{DEFAULT_INDEX_ID, INDEX_CONFIG_URI_MAP, INFER_INDEX_MAP
 pub struct GCSObjectData {
     pub bucket: String,
     pub name: String,
-    pub size: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -16,7 +16,7 @@ use std::str::FromStr;
 
 use quickwit_common::uri::Uri;
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::indexer::environment::{DEFAULT_INDEX_CONFIG_URI, INFER_INDEX_IDS};
 

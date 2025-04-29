@@ -16,10 +16,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{Instrument, debug_span, error, info, info_span};
 
-use super::environment::{DISABLE_JANITOR, DISABLE_MERGE, INDEX_CONFIG_URI};
+use super::environment::{DISABLE_JANITOR, DISABLE_MERGE};
 use super::ingest::{IngestArgs, ingest};
 use super::model::IndexerEvent;
-use crate::environment::INDEX_ID;
 use crate::logger;
 use crate::utils::CloudRunContainerContext;
 
@@ -36,8 +35,11 @@ pub struct CloudEvent<T> {
 async fn indexer_handler(event: CloudEvent<Value>) -> Result<Value, anyhow::Error> {
     let container_ctx = CloudRunContainerContext::load();
     let payload = serde_json::from_value::<IndexerEvent>(event.data)?;
-
+    let index_id = payload.index_id()?;
+    let index_config_uri = payload.index_config_uri()?;
     let ingest_res = ingest(IngestArgs {
+        index_id: index_id.clone(),
+        index_config_uri: index_config_uri.clone(),
         input_path: payload.uri()?,
         input_format: quickwit_config::SourceInputFormat::Json,
         vrl_script: None,
@@ -47,8 +49,8 @@ async fn indexer_handler(event: CloudEvent<Value>) -> Result<Value, anyhow::Erro
     })
     .instrument(debug_span!(
         "ingest",
-        env.INDEX_CONFIG_URI = *INDEX_CONFIG_URI,
-        env.INDEX_ID = *INDEX_ID,
+        env.INDEX_CONFIG_URI = index_config_uri,
+        env.INDEX_ID = index_id,
         env.DISABLE_MERGE = *DISABLE_MERGE,
         env.DISABLE_JANITOR = *DISABLE_JANITOR,
         cold = container_ctx.cold,

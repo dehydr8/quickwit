@@ -17,10 +17,6 @@ use std::env::var;
 use once_cell::sync::Lazy;
 use quickwit_common::get_bool_from_env;
 
-pub static INDEX_ID: Lazy<String> = Lazy::new(|| {
-    var("QW_CLOUDRUN_INDEX_ID").expect("environment variable `QW_CLOUDRUN_INDEX_ID` should be set")
-});
-
 /// Configures the fmt tracing subscriber to log as json and include span
 /// boundaries. This is very verbose and is only used to generate advanced KPIs
 /// from CloudRun runs (e.g. for blog post benchmarks)

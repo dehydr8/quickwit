@@ -38,6 +38,8 @@ use crate::utils::load_node_config;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct IngestArgs {
+    pub index_id: String,
+    pub index_config_uri: String,
     pub input_path: Uri,
     pub input_format: SourceInputFormat,
     pub vrl_script: Option<String>,
@@ -56,6 +58,8 @@ pub async fn ingest(args: IngestArgs) -> anyhow::Result<IndexingStatistics> {
         configure_source(args.input_path, args.input_format, args.vrl_script).await?;
 
     let index_metadata = init_index_if_necessary(
+        &args.index_id,
+        &args.index_config_uri,
         &mut metastore,
         &storage_resolver,
         &config.default_index_root_uri,
@@ -83,8 +87,12 @@ pub async fn ingest(args: IngestArgs) -> anyhow::Result<IndexingStatistics> {
     )
     .await?;
 
-    let (indexing_pipeline_handle, merge_pipeline_handle) =
-        spawn_pipelines(indexing_service_handle.mailbox(), source_config).await?;
+    let (indexing_pipeline_handle, merge_pipeline_handle) = spawn_pipelines(
+        &args.index_id,
+        indexing_service_handle.mailbox(),
+        source_config,
+    )
+    .await?;
 
     prune_cloudrun_source(&mut metastore, index_metadata).await?;
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::env::var;
+use std::{collections::HashMap, env::var};
 
 use once_cell::sync::Lazy;
 use quickwit_common::get_bool_from_env;
@@ -26,9 +26,43 @@ default_index_root_uri: gs://${QW_CLOUDRUN_INDEX_BUCKET}/${QW_CLOUDRUN_INDEX_PRE
 data_dir: /tmp
 "#;
 
-pub static INDEX_CONFIG_URI: Lazy<String> = Lazy::new(|| {
-    var("QW_CLOUDRUN_INDEX_CONFIG_URI")
-        .expect("environment variable `QW_CLOUDRUN_INDEX_CONFIG_URI` should be set")
+pub static DEFAULT_INDEX_ID: Lazy<String> =
+    Lazy::new(|| var("QW_CLOUDRUN_DEFAULT_INDEX_ID").map_or(String::new(), |v| v));
+
+pub static DEFAULT_INDEX_CONFIG_URI: Lazy<String> =
+    Lazy::new(|| var("QW_CLOUDRUN_DEFAULT_INDEX_CONFIG_URI").map_or(String::new(), |v| v));
+
+pub static INFER_INDEX_IDS: Lazy<bool> =
+    Lazy::new(|| get_bool_from_env("QW_CLOUDRUN_INFER_INDEX_IDS", false));
+
+pub static INFER_INDEX_MAP: Lazy<HashMap<String, String>> = Lazy::new(|| {
+    var("QW_CLOUDRUN_INFER_INDEX_MAP").map_or(HashMap::new(), |v| {
+        v.split(',')
+            .filter_map(|s| {
+                let parts: Vec<&str> = s.split('=').collect();
+                if parts.len() == 2 {
+                    Some((parts[0].to_string(), parts[1].to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    })
+});
+
+pub static INDEX_CONFIG_URI_MAP: Lazy<HashMap<String, String>> = Lazy::new(|| {
+    var("QW_CLOUDRUN_INDEX_CONFIG_URI_MAP").map_or(HashMap::new(), |v| {
+        v.split(',')
+            .filter_map(|s| {
+                let parts: Vec<&str> = s.split('=').collect();
+                if parts.len() == 2 {
+                    Some((parts[0].to_string(), parts[1].to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    })
 });
 
 pub static DISABLE_MERGE: Lazy<bool> =

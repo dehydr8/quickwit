@@ -16,6 +16,11 @@ use std::str::FromStr;
 
 use quickwit_common::uri::Uri;
 use serde::{Deserialize, Serialize};
+use tracing::{info, warn};
+
+use crate::indexer::environment::{DEFAULT_INDEX_CONFIG_URI, INFER_INDEX_IDS};
+
+use super::environment::{DEFAULT_INDEX_ID, INDEX_CONFIG_URI_MAP, INFER_INDEX_MAP};
 
 #[derive(Deserialize, Clone, Debug, Serialize)]
 pub struct GCSObjectData {
@@ -28,17 +33,85 @@ pub struct GCSObjectData {
 #[serde(untagged)]
 /// Event types that can be used to invoke the indexer CloudRun.
 pub enum IndexerEvent {
-    Custom { source_uri: String },
+    Custom {
+        source_uri: String,
+        index_id: String,
+        index_config_uri: String,
+    },
     GCS(GCSObjectData),
 }
 
 impl IndexerEvent {
     pub fn uri(&self) -> anyhow::Result<Uri> {
         let path: String = match self {
-            IndexerEvent::Custom { source_uri } => source_uri.clone(),
+            IndexerEvent::Custom {
+                index_id: _,
+                source_uri,
+                index_config_uri,
+            } => [source_uri, "#", index_config_uri].join(""),
             IndexerEvent::GCS(event) => ["gs://", &event.bucket, "/", &event.name].join(""),
         };
         Uri::from_str(&path)
+    }
+
+    pub fn index_id(&self) -> anyhow::Result<String> {
+        match self {
+            IndexerEvent::Custom { index_id, .. } => Ok(index_id.clone()),
+            // if INFER_INDEX_IDS is true, use the path to infer the index ID
+            // else use DEFAULT_INDEX_ID
+            IndexerEvent::GCS(event) => {
+                if *INFER_INDEX_IDS {
+                    // use event.name
+                    // it can be in the following formats:
+                    // - syslog/YYYY/MM/DD/xx.json
+                    // - appengine.googleapis.com/request_log/YYYY/MM/DD/xx.json
+                    //
+                    // The following parts will be the key:
+                    // - syslog
+                    // - appengine.googleapis.com/request_log
+                    //
+                    // The value of the index_id will be fetched from the INFER_INDEX_MAP
+
+                    let parts: Vec<&str> = event.name.split('/').collect();
+
+                    if parts.len() < 5 {
+                        return Err(anyhow::anyhow!(
+                            "Unable to infer index ID from GCS event name: {}",
+                            event.name
+                        ));
+                    }
+
+                    // The prefix is all parts except the last 4
+                    let prefix = parts[..parts.len() - 4].join("/");
+
+                    let index_id = INFER_INDEX_MAP.get(&prefix).ok_or(anyhow::anyhow!(
+                        "Unable to infer index ID from GCS event name: {}",
+                        event.name
+                    ))?;
+                    Ok(index_id.to_string())
+                } else {
+                    Ok(DEFAULT_INDEX_ID.clone())
+                }
+            }
+        }
+    }
+
+    pub fn index_config_uri(&self) -> anyhow::Result<String> {
+        match self {
+            IndexerEvent::Custom {
+                index_config_uri, ..
+            } => Ok(index_config_uri.clone()),
+            IndexerEvent::GCS(_) => {
+                let index_id = self.index_id()?;
+                let index_config_uri = if let Some(uri) = INDEX_CONFIG_URI_MAP.get(&index_id) {
+                    uri.clone()
+                } else {
+                    warn!("Unable to find index config URI for index ID: {}", index_id);
+                    DEFAULT_INDEX_CONFIG_URI.clone()
+                };
+                Ok(index_config_uri)
+            }
+        }
     }
 }
 

@@ -50,10 +50,7 @@ use quickwit_storage::StorageResolver;
 use quickwit_telemetry::payload::{QuickwitFeature, QuickwitTelemetryInfo, TelemetryEvent};
 use tracing::{debug, info, instrument};
 
-use crate::environment::INDEX_ID;
-use crate::indexer::environment::{
-    DISABLE_JANITOR, DISABLE_MERGE, INDEX_CONFIG_URI, MAX_CHECKPOINTS,
-};
+use crate::indexer::environment::{DISABLE_JANITOR, DISABLE_MERGE, MAX_CHECKPOINTS};
 
 const CLOUDRUN_SOURCE_ID: &str = "ingest-cloudrun-source";
 
@@ -104,10 +101,11 @@ fn dir_and_filename(filepath: &Path) -> anyhow::Result<(Uri, &Path)> {
 
 #[instrument(level = "debug", skip(resolver))]
 pub(super) async fn load_index_config(
+    index_config_uri: &str,
     resolver: &StorageResolver,
     default_index_root_uri: &Uri,
 ) -> anyhow::Result<IndexConfig> {
-    let (dir, file) = dir_and_filename(Path::new(&*INDEX_CONFIG_URI))?;
+    let (dir, file) = dir_and_filename(Path::new(index_config_uri))?;
     let index_config_storage = resolver.resolve(&dir).await?;
     let bytes = index_config_storage.get_all(file).await?;
     let mut index_config = load_index_config_from_user_config(
@@ -154,13 +152,15 @@ pub(super) async fn configure_source(
 /// If the index exists but without the CloudRun source ([`CLOUDRUN_SOURCE_ID`]),
 /// the source is added.
 pub(super) async fn init_index_if_necessary(
+    index_id: &str,
+    index_config_uri: &str,
     metastore: &mut MetastoreServiceClient,
     storage_resolver: &StorageResolver,
     default_index_root_uri: &Uri,
     source_config: &SourceConfig,
 ) -> anyhow::Result<IndexMetadata> {
     let metadata_result = metastore
-        .index_metadata(IndexMetadataRequest::for_index_id(INDEX_ID.clone()))
+        .index_metadata(IndexMetadataRequest::for_index_id(index_id.to_string()))
         .await;
     let metadata = match metadata_result {
         Ok(metadata_resp) => {
@@ -172,7 +172,7 @@ pub(super) async fn init_index_if_necessary(
                 )?;
                 metastore.add_source(add_source_request).await?;
                 metastore
-                    .index_metadata(IndexMetadataRequest::for_index_id(INDEX_ID.clone()))
+                    .index_metadata(IndexMetadataRequest::for_index_id(index_id.to_string()))
                     .await?
                     .deserialize_index_metadata()?
             } else {
@@ -181,15 +181,17 @@ pub(super) async fn init_index_if_necessary(
         }
         Err(MetastoreError::NotFound(_)) => {
             info!(
-                index_id = *INDEX_ID,
-                index_config_uri = *INDEX_CONFIG_URI,
+                index_id = index_id,
+                index_config_uri = index_config_uri,
                 "Index not found, creating it"
             );
-            let index_config = load_index_config(storage_resolver, default_index_root_uri).await?;
-            if index_config.index_id != *INDEX_ID {
+            let index_config =
+                load_index_config(index_config_uri, storage_resolver, default_index_root_uri)
+                    .await?;
+            if index_config.index_id != index_id {
                 bail!(
                     "Expected index ID was {} but config file had {}",
-                    *INDEX_ID,
+                    index_id,
                     index_config.index_id,
                 );
             }
@@ -265,12 +267,13 @@ pub(super) async fn spawn_services(
 
 /// Spawn and split an indexing pipeline
 pub(super) async fn spawn_pipelines(
+    index_id: &str,
     indexing_server_mailbox: &Mailbox<IndexingService>,
     source_config: SourceConfig,
 ) -> anyhow::Result<(ActorHandle<IndexingPipeline>, ActorHandle<MergePipeline>)> {
     let pipeline_id = indexing_server_mailbox
         .ask_for_res(SpawnPipeline {
-            index_id: INDEX_ID.clone(),
+            index_id: index_id.to_string(),
             source_config,
             pipeline_uid: PipelineUid::default(),
         })

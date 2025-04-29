@@ -12,25 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{Instrument, debug_span, error, info, info_span};
 
+use super::cloudevent::CloudEvent;
 use super::environment::{DISABLE_JANITOR, DISABLE_MERGE};
 use super::ingest::{IngestArgs, ingest};
 use super::model::IndexerEvent;
 use crate::logger;
 use crate::utils::CloudRunContainerContext;
-
-#[derive(Deserialize, Clone, Debug, Serialize)]
-pub struct CloudEvent<T> {
-    pub id: String,
-    pub datacontenttype: String,
-    pub specversion: String,
-    #[serde(rename = "type")]
-    pub _type: String,
-    pub data: T,
-}
 
 async fn indexer_handler(event: CloudEvent<Value>) -> Result<Value, anyhow::Error> {
     let container_ctx = CloudRunContainerContext::load();

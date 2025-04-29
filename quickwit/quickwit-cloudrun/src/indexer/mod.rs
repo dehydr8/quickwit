@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod cloudevent;
 mod environment;
 mod handler;
 mod ingest;
 mod model;
 
-pub use handler::CloudEvent;
+pub use cloudevent::CloudEvent;
 pub use handler::handler;

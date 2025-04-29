@@ -14,14 +14,15 @@
 
 use quickwit_cloudrun::indexer::{CloudEvent, handler};
 use quickwit_cloudrun::logger;
-use quickwit_proto::bytes::Bytes;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::env;
 use std::net::SocketAddr;
 use tokio::signal;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use warp;
 use warp::Filter;
+use warp::http::HeaderMap;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -30,27 +31,31 @@ async fn main() -> anyhow::Result<()> {
     // Define the handler for the indexer
     let indexer = warp::post()
         .and(warp::path::end())
-        .and(warp::header::header("content-type"))
-        .and(warp::body::bytes())
-        .and_then(|content_type: String, body: Bytes| async move {
-            if !content_type.eq_ignore_ascii_case("application/json")
-                && !content_type.eq_ignore_ascii_case("application/cloudevents+json")
-            {
-                warn!("Invalid content type: {}", content_type);
-                return Err(warp::reject::custom(InvalidContentType));
-            }
+        .and(warp::header::headers_cloned())
+        .and(warp::body::json())
+        .and_then(|headers: HeaderMap, body: Value| async move {
+            // Check if we have CloudEvent headers
+            let ce_headers = extract_cloudevent_headers(&headers);
 
-            debug!("Content type: {}, Body: {:?}", content_type, body);
+            match CloudEvent::from_headers(&ce_headers, body) {
+                Some(cloudevent) => {
+                    if !cloudevent.is_valid() {
+                        warn!("Invalid CloudEvent headers: {:?}", ce_headers);
+                        return Err(warp::reject::custom(InternalError));
+                    }
 
-            let payload: CloudEvent<Value> =
-                serde_json::from_slice(&body).map_err(|_| warp::reject::custom(InvalidJson))?;
-
-            let result = handler(payload).await;
-            match result {
-                Ok(value) => Ok(warp::reply::json(&value)),
-                Err(e) => {
-                    eprintln!("Error handling request: {:?}", e);
-                    Err(warp::reject::custom(InternalError))
+                    let result = handler(cloudevent).await;
+                    return match result {
+                        Ok(value) => Ok(warp::reply::json(&value)),
+                        Err(e) => {
+                            warn!("Error handling request: {:?}", e);
+                            Err(warp::reject::custom(InternalError))
+                        }
+                    };
+                }
+                None => {
+                    warn!("Invalid headers or body: {:?}", ce_headers);
+                    return Err(warp::reject::custom(InternalError));
                 }
             }
         });
@@ -77,13 +82,22 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
-struct InvalidContentType;
-impl warp::reject::Reject for InvalidContentType {}
-
-#[derive(Debug)]
-struct InvalidJson;
-impl warp::reject::Reject for InvalidJson {}
+/// Extract CloudEvent headers from the request headers
+/// CloudEvent headers are prefixed with "ce-" in HTTP binding
+fn extract_cloudevent_headers(headers: &HeaderMap) -> HashMap<String, String> {
+    let mut ce_headers = HashMap::new();
+    
+    for (key, value) in headers.iter() {
+        let key_str = key.to_string().to_lowercase();
+        if key_str.starts_with("ce-") {
+            if let Ok(value_str) = value.to_str() {
+                ce_headers.insert(key_str, value_str.to_string());
+            }
+        }
+    }
+    
+    ce_headers
+}
 
 #[derive(Debug)]
 struct InternalError;

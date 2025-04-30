@@ -69,6 +69,10 @@ export type DocMapping = {
 
 export type SortOrder = 'Asc' | 'Desc';
 
+export type User = {
+  email: string;
+}
+
 export type SortByField = {
   field_name: string,
   order: SortOrder

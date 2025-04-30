@@ -18,7 +18,8 @@ import styled from '@emotion/styled';
 import { FieldMapping, getAllFields, IndexMetadata } from '../utils/models';
 import { ChevronRight, KeyboardArrowDown } from '@mui/icons-material';
 import Tooltip from '@mui/material/Tooltip';
-import { Client } from '../services/client';
+import { buildRegionalClient } from '../services/client';
+import { useRegion } from '../providers/RegionProvider';
 
 const IndexBarWrapper = styled('div')({
   display: 'flex',
@@ -35,10 +36,11 @@ function IndexAutocomplete(props: IndexMetadataProps) {
   const [options, setOptions] = React.useState<readonly IndexMetadata[]>([]);
   const [value, setValue] = React.useState<IndexMetadata | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const { region } = useRegion();
   // We want to show the circular progress only if we are loading some results and
   // when there is no option available.
   const showLoading = loading && options.length === 0;
-  const quickwitClient = useMemo(() => new Client(), []);
+  const quickwitClient = useMemo(() => buildRegionalClient(region), [region]);
 
   useEffect(() => {
     if (loading) {

@@ -12,11 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Cluster, Index, IndexMetadata, QuickwitBuildInfo, SearchRequest, SearchResponse, SplitMetadata } from "../utils/models";
+import { Cluster, Index, IndexMetadata, QuickwitBuildInfo, SearchRequest, SearchResponse, SplitMetadata, User } from "../utils/models";
 import { serializeSortByField } from "../utils/urls";
+
+export function buildRegionalClient(region: string | null): Client {
+  const client = new Client();
+  if (region) {
+    client.setRegion(region);
+  }
+  return client;
+}
 
 export class Client {
   private readonly _host: string
+  private region: string | null = null
 
   constructor(host?: string) {
     if (!host) {
@@ -24,6 +33,10 @@ export class Client {
     } else {
       this._host = host
     }
+  }
+
+  setRegion(region: string) {
+    this.region = region
   }
 
   apiRoot(): string {
@@ -81,11 +94,22 @@ export class Client {
     return this.fetch(`${this.apiRoot()}indexes`, {});
   }
 
+  async listRegions(): Promise<Array<string>> {
+    return this.fetch(`${this.apiRoot()}regions`, {});
+  }
+
+  async currentUser(): Promise<User> {
+    return this.fetch(`${this.apiRoot()}user`, {});
+  }
+
   async fetch<T>(url: string, params: RequestInit, body: string|null = null): Promise<T> {
     if (body !== null) {
       params.method = "POST";
       params.body = body;
       params.headers = {...params.headers, "content-type": "application/json"};
+    }
+    if (this.region !== null) {
+      params.headers = {...params.headers, "x-quickwit-region": this.region};
     }
     const response = await fetch(url, params);
     if (response.ok) {

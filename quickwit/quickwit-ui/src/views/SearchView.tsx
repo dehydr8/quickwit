@@ -22,9 +22,10 @@ import { QueryEditor } from '../components/QueryEditor/QueryEditor';
 import { AggregationEditor } from '../components/QueryEditor/AggregationEditor';
 import SearchResult from '../components/SearchResult/SearchResult';
 import { useLocalStorage } from '../providers/LocalStorageProvider';
-import { Client } from '../services/client';
+import { buildRegionalClient } from '../services/client';
 import { EMPTY_SEARCH_REQUEST, Index, IndexMetadata, ResponseError, SearchRequest, SearchResponse } from '../utils/models';
 import { hasSearchParams, parseSearchUrl, toUrlSearchRequestParams } from '../utils/urls';
+import { useRegion } from '../providers/RegionProvider';
 
 function updateSearchRequestWithIndex(index: Index | null, searchRequest: SearchRequest) {
   // If we have a timestamp field, order by desc on the timestamp field.
@@ -53,7 +54,8 @@ function SearchView() {
   const [queryRunning, setQueryRunning] = useState(false);
   const [searchRequest, setSearchRequest] = useState<SearchRequest>(hasSearchParams(location.search) ? parseSearchUrl(location.search) : EMPTY_SEARCH_REQUEST);
   const updateLastSearchRequest = useLocalStorage().updateLastSearchRequest;
-  const quickwitClient = useMemo(() => new Client(), []);
+  const { region } = useRegion();
+  const quickwitClient = useMemo(() => buildRegionalClient(region), [region]);
 
   const runSearch = (updatedSearchRequest: SearchRequest) => {
     if (!updatedSearchRequest || !updatedSearchRequest.indexId) {

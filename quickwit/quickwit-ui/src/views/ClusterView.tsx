@@ -19,15 +19,16 @@ import { JsonEditor } from '../components/JsonEditor';
 import { ViewUnderAppBarBox, FullBoxContainer, QBreadcrumbs } from '../components/LayoutUtils';
 import Loader from '../components/Loader';
 import ErrorResponseDisplay from '../components/ResponseErrorDisplay';
-import { Client } from '../services/client';
+import { buildRegionalClient } from '../services/client';
 import { Cluster, ResponseError } from '../utils/models';
-
+import { useRegion } from '../providers/RegionProvider';
 
 function ClusterView() {
   const [loading, setLoading] = useState(false);
   const [cluster, setCluster] = useState<null | Cluster>(null);
   const [responseError, setResponseError] = useState<ResponseError | null>(null);
-  const quickwitClient = useMemo(() => new Client(), []);
+  const { region } = useRegion();
+  const quickwitClient = useMemo(() => buildRegionalClient(region), [region]);
 
   useEffect(() => {
     setLoading(true);

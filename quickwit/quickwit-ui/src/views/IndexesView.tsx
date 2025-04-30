@@ -15,18 +15,20 @@
 import { Box, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import IndexesTable from '../components/IndexesTable';
-import { Client } from '../services/client';
+import { buildRegionalClient } from '../services/client';
 import Loader from '../components/Loader';
 import { IndexMetadata, ResponseError } from '../utils/models';
 import { ViewUnderAppBarBox, FullBoxContainer, QBreadcrumbs } from '../components/LayoutUtils';
 import ApiUrlFooter from '../components/ApiUrlFooter';
 import ErrorResponseDisplay from '../components/ResponseErrorDisplay';
+import { useRegion } from '../providers/RegionProvider';
 
 function IndexesView() {
   const [loading, setLoading] = useState(false);
   const [responseError, setResponseError] = useState<ResponseError | null>(null);
   const [indexesMetadata, setIndexesMetadata] = useState<IndexMetadata[]>();
-  const quickwitClient = useMemo(() => new Client(), []);
+  const { region } = useRegion();
+  const quickwitClient = useMemo(() => buildRegionalClient(region), [region]);
 
   const renderFetchIndexesResult = () => {
     if (responseError !== null) {

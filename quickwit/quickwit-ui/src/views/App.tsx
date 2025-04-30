@@ -25,25 +25,28 @@ import { LocalStorageProvider } from '../providers/LocalStorageProvider';
 import ClusterView from './ClusterView';
 import NodeInfoView from './NodeInfoView';
 import ApiView from './ApiView';
+import { RegionProvider } from '../providers/RegionProvider';
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <LocalStorageProvider>
-        <FullBoxContainer sx={{flexDirection: 'row', p: 0}}>
-          <CssBaseline />
-          <TopBar />
-          <SideBar />
-          <Routes>
-            <Route path="/" element={<Navigate to="/search" />} />
-            <Route path="search" element={<SearchView />} />
-            <Route path="indexes" element={<IndexesView />} />
-            <Route path="indexes/:indexId" element={<IndexView />} />
-            <Route path="cluster" element={<ClusterView />} />
-            <Route path="node-info" element={<NodeInfoView />} />
-            <Route path="api-playground" element={<ApiView />} />
-          </Routes>
-        </FullBoxContainer>
+        <RegionProvider>
+          <FullBoxContainer sx={{flexDirection: 'row', p: 0}}>
+            <CssBaseline />
+            <TopBar />
+            <SideBar />
+            <Routes>
+              <Route path="/" element={<Navigate to="/search" />} />
+              <Route path="search" element={<SearchView />} />
+              <Route path="indexes" element={<IndexesView />} />
+              <Route path="indexes/:indexId" element={<IndexView />} />
+              <Route path="cluster" element={<ClusterView />} />
+              <Route path="node-info" element={<NodeInfoView />} />
+              <Route path="api-playground" element={<ApiView />} />
+            </Routes>
+          </FullBoxContainer>
+        </RegionProvider>
       </LocalStorageProvider>
     </ThemeProvider>
   );

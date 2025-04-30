@@ -19,8 +19,9 @@ import ApiUrlFooter from '../components/ApiUrlFooter';
 import { JsonEditor } from '../components/JsonEditor';
 import { ViewUnderAppBarBox, FullBoxContainer, QBreadcrumbs } from '../components/LayoutUtils';
 import Loader from '../components/Loader';
-import { Client } from '../services/client';
+import { buildRegionalClient } from '../services/client';
 import { QuickwitBuildInfo } from '../utils/models';
+import { useRegion } from '../providers/RegionProvider';
 
 const CustomTabPanel = styled(TabPanel)`
 padding-left: 0;
@@ -35,7 +36,8 @@ function NodeInfoView() {
   const [nodeConfig, setNodeConfig] = useState<null | Record<string, any>>(null);
   const [buildInfo, setBuildInfo] = useState<null | QuickwitBuildInfo>(null);
   const [tabIndex, setTabIndex] = useState('1');
-  const quickwitClient = useMemo(() => new Client(), []);
+  const { region } = useRegion();
+  const quickwitClient = useMemo(() => buildRegionalClient(region), [region]);
 
   const urlByTab: Record<string, string> = {
     '1': 'api/v1/config',

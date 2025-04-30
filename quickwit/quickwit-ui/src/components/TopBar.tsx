@@ -15,11 +15,13 @@
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import GitHubIcon from '@mui/icons-material/GitHub';
-import { Box, IconButton, Link, styled, SvgIcon, Tooltip, Typography } from '@mui/material';
+import { Box, FormControl, IconButton, Link, MenuItem, Select, styled, SvgIcon, Tooltip, Typography } from '@mui/material';
 import { Discord } from '@styled-icons/fa-brands/Discord';
 import { ReactComponent as Logo } from '../assets/img/quickwit-logo.svg';
 import { Client } from '../services/client';
 import { useEffect, useMemo, useState } from 'react';
+import { User } from '../utils/models';
+import { useRegion } from '../providers/RegionProvider';
 
 const StyledAppBar = styled(AppBar)(({ theme })=>({
   zIndex: theme.zIndex.drawer + 1,
@@ -34,25 +36,61 @@ declare module '@mui/material/AppBar' {
 
 const TopBar = () => {
   const [clusterId, setClusterId] = useState<string>("");
+  const [regions, setRegions] = useState<Array<string>>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const { region, setRegion } = useRegion();
   const quickwitClient = useMemo(() => new Client(), []);
 
   useEffect(() => {
     quickwitClient.cluster().then(cluster => {
       setClusterId(cluster.cluster_id);
     });
+    quickwitClient.listRegions().then(regions => {
+      setRegions(regions);
+    });
+    quickwitClient.currentUser().then(user => {
+      setUser(user);
+    });
   }, [])
+
+  // Set the region to the first region if no region is selected.
+  useEffect(() => {
+    if (!region && regions.length > 0) {
+      setRegion(regions[0]!);
+    }
+  }, [region, regions, setRegion]);
 
   return (
     <StyledAppBar position="fixed" elevation={0} color="neutral">
       <Toolbar variant="dense">
         <Box sx={{ flexGrow: 1, p: 0, m: 0, display: 'flex', alignItems: 'center' }}>
           <Logo height='25px'></Logo>
+          {/* Region selector */}
+          <FormControl size="small" sx={{ mx: 2 }}>
+            <Select
+              value={region || ''}
+              onChange={(event) => setRegion(event.target.value)}
+            >
+              {regions.map((region) => (
+                <MenuItem key={region} value={region}>
+                  {region}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Tooltip title="Cluster ID" placement="right">
             <Typography mx={2}>
               {clusterId}
             </Typography>
           </Tooltip>
         </Box>
+        {user && (
+          <Box sx={{ flexGrow: 1, p: 0, m: 0, display: 'flex', alignItems: 'center' }}>
+            <Typography mx={2}>
+              {user.email}
+            </Typography>
+          </Box>
+        )}
         <Link href="https://quickwit.io/docs" target="_blank" sx={{ px: 2 }}>
             Docs
         </Link>

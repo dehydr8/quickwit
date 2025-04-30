@@ -15,7 +15,7 @@
 import { Box, styled, Typography, Tab } from '@mui/material';
 import Link, { LinkProps } from '@mui/material/Link';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Client } from '../services/client';
+import { buildRegionalClient } from '../services/client';
 import Loader from '../components/Loader';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { Index } from '../utils/models';
@@ -24,6 +24,7 @@ import { IndexSummary } from '../components/IndexSummary';
 import { JsonEditor } from '../components/JsonEditor';
 import { ViewUnderAppBarBox, FullBoxContainer, QBreadcrumbs } from '../components/LayoutUtils';
 import ApiUrlFooter from '../components/ApiUrlFooter';
+import { useRegion } from '../providers/RegionProvider';
 
 export type ErrorResult = {
   error: string;
@@ -51,7 +52,8 @@ function IndexView() {
   const [, setLoadingError] = useState<ErrorResult | null>(null)
   const [tabIndex, setTabIndex] = useState('1');
   const [index, setIndex] = useState<Index>()
-  const quickwitClient = useMemo(() => new Client(), []);
+  const { region } = useRegion();
+  const quickwitClient = useMemo(() => buildRegionalClient(region), [region]);
 
   const handleTabIndexChange = (_: React.SyntheticEvent, newValue: string) => {
     setTabIndex(newValue);

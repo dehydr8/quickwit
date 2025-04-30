@@ -17,14 +17,15 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use http::Method;
-use quickwit_config::SearcherConfig;
+use quickwit_cluster::Cluster;
+use quickwit_config::{NodeConfig, SearcherConfig};
 use quickwit_config::service::QuickwitService;
 use quickwit_proto::metastore::MetastoreServiceClient;
 use quickwit_search::{
     ClusterClient, SearchJobPlacer, SearchService, SearchServiceClient, SearchServiceImpl,
     SearcherContext, SearcherPool,
 };
-use quickwit_serve::lambda_search_api::*;
+use quickwit_serve::{lambda_search_api::*, BuildInfo, RuntimeInfo};
 use quickwit_storage::StorageResolver;
 use quickwit_telemetry::payload::{QuickwitFeature, QuickwitTelemetryInfo, TelemetryEvent};
 use tracing::{error, info};
@@ -34,6 +35,7 @@ use warp::reject::Rejection;
 
 use crate::searcher::environment::CONFIGURATION_TEMPLATE;
 use crate::utils::load_node_config;
+use crate::searcher::helpers::create_empty_cluster;
 
 async fn create_local_search_service(
     searcher_config: SearcherConfig,
@@ -87,18 +89,34 @@ fn es_compat_api(
 fn index_api(
     metastore: MetastoreServiceClient,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone {
-    get_index_metadata_handler(metastore)
+    get_index_metadata_handler(metastore.clone())
+        .or(list_indexes_metadata_handler(metastore.clone()))
+        .or(list_splits_handler(metastore.clone()))
+}
+
+fn cluster_api(
+    cluster: Cluster,
+) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone {
+    cluster_handler(cluster)
 }
 
 fn v1_searcher_api(
     search_service: Arc<dyn SearchService>,
     metastore: MetastoreServiceClient,
+    cluster: Cluster,
+    node_config: NodeConfig,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Rejection> + Clone {
     warp::path!("api" / "v1" / ..)
         .and(
             native_api(search_service.clone())
                 .or(es_compat_api(search_service, metastore.clone()))
-                .or(index_api(metastore)),
+                .or(index_api(metastore.clone()))
+                .or(cluster_api(cluster))
+                .or(node_info_handler(
+                    BuildInfo::get(),
+                    RuntimeInfo::get(),
+                    Arc::new(node_config),
+                )),
         )
         .with(warp::filters::compression::gzip())
         .recover(|rejection| {
@@ -119,11 +137,14 @@ pub async fn setup_searcher_api()
     let _telemetry_handle_opt = quickwit_telemetry::start_telemetry_loop(telemetry_info);
 
     let search_service = create_local_search_service(
-        node_config.searcher_config,
+        node_config.searcher_config.clone(),
         metastore.clone(),
         storage_resolver,
     )
     .await;
+
+    let services = vec![QuickwitService::Searcher];
+    let cluster = create_empty_cluster(&node_config, &services[..]).await?;
 
     let before_hook = warp::path::full()
         .and(warp::method())
@@ -144,7 +165,7 @@ pub async fn setup_searcher_api()
 
     let api = warp::any()
         .and(before_hook)
-        .and(v1_searcher_api(search_service, metastore))
+        .and(v1_searcher_api(search_service, metastore, cluster, node_config))
         .with(after_hook);
 
     Ok(api)

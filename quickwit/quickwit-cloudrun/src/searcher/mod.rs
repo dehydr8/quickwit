@@ -14,5 +14,5 @@
 
 mod api;
 mod environment;
-
+mod helpers;
 pub use api::setup_searcher_api;

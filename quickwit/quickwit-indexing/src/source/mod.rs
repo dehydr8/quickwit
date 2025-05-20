@@ -147,6 +147,12 @@ static EMIT_BATCHES_TIMEOUT: Lazy<Duration> = Lazy::new(|| {
     }
 });
 
+static FALLBACK_TO_EMPTY_CHECKPOINT: Lazy<bool> = Lazy::new(|| {
+    std::env::var("QW_FALLBACK_TO_EMPTY_CHECKPOINT")
+        .map(|v| v == "true")
+        .unwrap_or(false)
+});
+
 /// Runtime configuration used during execution of a source actor.
 #[derive(Clone)]
 pub struct SourceRuntime {
@@ -188,21 +194,23 @@ impl SourceRuntime {
         let response = self.metastore.clone().index_metadata(request).await?;
         let index_metadata = response.deserialize_index_metadata()?;
 
-        if let Some(checkpoint) = index_metadata
-            .checkpoint
-            .source_checkpoint(self.source_id())
-            .cloned()
-        {
-            return Ok(checkpoint);
+        match index_metadata.checkpoint.source_checkpoint(self.source_id()) {
+            Some(checkpoint) => Ok(checkpoint.clone()),
+            // If the checkpoint is not found, we fallback to an empty checkpoint.
+            // This prevents the retry loop to retry endlessly in case of a transient error
+            // for serverless backends.
+            None if *FALLBACK_TO_EMPTY_CHECKPOINT => Ok(SourceCheckpoint::default()),
+            // If the checkpoint is not found and we do not fallback to an empty checkpoint,
+            // we return an error.
+            None => Err(MetastoreError::Internal {
+                message: format!(
+                    "could not find checkpoint for index `{}` and source `{}`",
+                    self.index_uid(),
+                    self.source_id()
+                ),
+                cause: "".to_string(),
+            }),
         }
-        Err(MetastoreError::Internal {
-            message: format!(
-                "could not find checkpoint for index `{}` and source `{}`",
-                self.index_uid(),
-                self.source_id()
-            ),
-            cause: "".to_string(),
-        })
     }
 }
 
